@@ -74,29 +74,39 @@ How about we filter out some rows? Our researcher was primarily only interested 
 tail -100 ebd_la_reduced.tsv | awk '$7 ~ /^20[0-9]{2}/' 
 ```
 
-Ok, now let's winnow down our data set to just those from the 2000s. We could also use the `shuf` command to randomly sample a number of lines. 
+Ok, now let's winnow down our data set to just those from the 2000s. We could also use the `shuf`  command to randomly sample a number of lines. See this tutorial: <https://shapeshed.com/unix-shuf/#how-to-pick-a-random-line-from-a-file>
 
 ```{bash}
 head -n 1 ebd_la_reduced.tsv > 2000s_bird_la.tsv
 awk '$7 ~ /200[0-9]-[0-9]{2}-[0-9]{2}/' ebd_la_reduced.tsv >> 2000s_bird_la.tsv
 ```
 
+We can look and see what the file is: 
+
 ```{bash}
-head -100 2000s_bird_la.tsv
+head -20 2000s_bird_la.tsv
 ```
+
+The `ls` file has a `h` flag that when used with the `l` flag will give us the human readable size (so instead of in bytes, shows us gigabites size).
+
 ```{bash}
 ls -lh 
 ```
 
 ## Reading into R 
 
+Ok, we reduced the size of the file. We can now read it into R, by using the following command: 
+
 ```{r}
 birds <- read_tsv("2000s_bird_la.tsv")
 ```
+In R this makes it into a dataframe. To clean up the variable names I'll use the `janitor` package. By default R doesn't like spaces in the variable names. `janitor` has a handy function named `clean_names`. We run this agains the birds data and overwrite it against itself.
 
 ```{r}
 birds <- clean_names(birds)
 ```
+
+Ok, now we can look at the data R. Let's use the `count` function to count up the occurances of the type of birds by common name in our dataframe. We'll then sort it in descending order using `arrange`. Finally, I only want to see the top 10 most frequently observed birds. 
 
 ```{r}
 birds %>% 
@@ -104,6 +114,8 @@ birds %>%
   arrange(desc(n)) %>% 
   head(n=10)
 ```
+
+Ok, we now have an ordered list with that code. Next up let's make a bar chart. We'll use the same code we just created, but will pipe it into a graphing function called `ggplot`. In R, the piping syntax is `%>%`. The result will be a bar chart of counts by common name.
 
 ```{r}
 birds %>% 
@@ -114,13 +126,16 @@ birds %>%
     geom_col() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ``` 
 
-```{r}
-la_county<-get_stamenmap(location='los angeles county')
-```
+Next let's put the top ten birds observations on a map.  The first step we'll need to do is filter our data set and retain only the occurances of our top ten birds. Why are we doing this? Mapping all birds with all sighting would likely overwhelm the maps with lots of overplotting, making it hard to read. 
+
+Below, we'll pipe birds into filter and only retain the birds we want. We'll assign this to a new dataframe called top10birds. 
+
 ```{r}
 top10birds <- birds %>% 
   filter(common_name == c("American Crow", "Anna's Hummingbird", "Black Phoebe", "California Scrub-Jay", "California Towhee", "House Finch", "Lesser Goldfinch", "Mourning Dove", "Northern Mockingbird", "Yellow-rumped Warbler"))
 ```
+
+Ok, for the mapping, we use a package called `ggmap`. Inside the `ggmap` function we use a function called `get_stamenmap` and that function wants a bounding box `bbox` - this defines what the rectangular area of the world we want to map to appear. `get_stamen` will return the tiles (images) that represent that bounding box. After this we tell `ggmap` the type of plot we want to overlay on the map `geom_point`. Inside of this we set what variables in our dataset contain the latitude and longitude and how we want to color the dots (by `common_name`). We tell `ggmap` what dataframe to use and finally, we set an `alpha` or transparancy to our points. This makes them slightly transparent so we can see more of the underlying structure if they overlay each othter. Ok, that was a lot. Let's run and look at it. 
 
 ```{r}
 ggmap(get_stamenmap(bbox = c(left = -118.9596, bottom = 33.6633, right =
